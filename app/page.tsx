@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, MouseEvent, PointerEvent as ReactPointerEvent, WheelEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   AppState,
@@ -35,8 +35,20 @@ function linkPath(a: Device, b: Device, order: number): string {
   return `M ${a.x} ${a.y} L ${a.x} ${midY} L ${b.x} ${midY} L ${b.x} ${b.y}`;
 }
 
-function getLinkIcon(type: DeviceType): string {
-  return type === 'wifi-point' ? '🛜' : '🔌';
+function getDeviceTypeIcon(type: DeviceType): string {
+  const iconByType: Record<DeviceType, string> = {
+    'wifi-point': '📶',
+    'security-camera': '📹',
+    'rj45-outlet': '🧩',
+    'lutron-recessed-fitting': '💡',
+    'lighting-gang-box-control': '🎛️',
+    'lutron-keypad': '⌨️',
+    'audio-control': '🔊',
+    'lutron-processor': '🧠',
+    'network-switch': '🔀'
+  };
+
+  return iconByType[type];
 }
 
 export default function Home() {
@@ -49,8 +61,11 @@ export default function Home() {
   const [showLinks, setShowLinks] = useState(true);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const dragDeviceIdRef = useRef<string | null>(null);
+  const panDragRef = useRef<{ x: number; y: number } | null>(null);
+  const panMovedRef = useRef(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
 
   useEffect(() => {
     const loadState = async () => {
@@ -122,6 +137,7 @@ export default function Home() {
   useEffect(() => {
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
+    panMovedRef.current = false;
   }, [state.selectedFloorId]);
 
   const floorLinks = useMemo<FloorLink[]>(() => {
@@ -233,6 +249,11 @@ export default function Home() {
   };
 
   const onFloorClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (panMovedRef.current) {
+      panMovedRef.current = false;
+      return;
+    }
+
     if (!selectedFloor || !imageContainerRef.current) {
       return;
     }
@@ -264,6 +285,43 @@ export default function Home() {
     }));
   };
 
+
+  const onCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-device-marker="true"]')) {
+      return;
+    }
+
+    panDragRef.current = { x: event.clientX, y: event.clientY };
+    panMovedRef.current = false;
+    setIsPanning(true);
+  };
+
+  const onCanvasWheel = (event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    const nextZoom = Math.min(3, Math.max(0.6, Number((zoomLevel - event.deltaY * 0.001).toFixed(2))));
+    if (nextZoom === zoomLevel) {
+      return;
+    }
+
+    if (!imageContainerRef.current) {
+      setZoomLevel(nextZoom);
+      return;
+    }
+
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left;
+    const pointerY = event.clientY - rect.top;
+    const scaleRatio = nextZoom / zoomLevel;
+
+    setPanOffset((prev) => ({
+      x: Number((pointerX - (pointerX - prev.x) * scaleRatio).toFixed(2)),
+      y: Number((pointerY - (pointerY - prev.y) * scaleRatio).toFixed(2))
+    }));
+    setZoomLevel(nextZoom);
+  };
+
   const moveDeviceToPointer = (deviceId: string, clientX: number, clientY: number) => {
     if (!imageContainerRef.current) {
       return;
@@ -290,15 +348,31 @@ export default function Home() {
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
       const draggingDeviceId = dragDeviceIdRef.current;
-      if (!draggingDeviceId) {
+      if (draggingDeviceId) {
+        moveDeviceToPointer(draggingDeviceId, event.clientX, event.clientY);
         return;
       }
 
-      moveDeviceToPointer(draggingDeviceId, event.clientX, event.clientY);
+      const panDrag = panDragRef.current;
+      if (!panDrag) {
+        return;
+      }
+
+      const deltaX = event.clientX - panDrag.x;
+      const deltaY = event.clientY - panDrag.y;
+
+      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+        panMovedRef.current = true;
+      }
+
+      panDragRef.current = { x: event.clientX, y: event.clientY };
+      setPanOffset((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
     };
 
     const stopDragging = () => {
       dragDeviceIdRef.current = null;
+      panDragRef.current = null;
+      setIsPanning(false);
     };
 
     window.addEventListener('pointermove', onPointerMove);
@@ -492,7 +566,12 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            <div className="floorCanvas" onClick={onFloorClick}>
+            <div
+              className={isPanning ? "floorCanvas isPanning" : "floorCanvas"}
+              onClick={onFloorClick}
+              onPointerDown={onCanvasPointerDown}
+              onWheel={onCanvasWheel}
+            >
               <div
                 className="floorCanvasStage"
                 ref={imageContainerRef}
@@ -532,8 +611,12 @@ export default function Home() {
                         event.stopPropagation();
                         setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
                       }}
-                      title={device.name}
-                    />
+                      title={`${getDeviceTypeIcon(device.type)} ${device.name}`}
+                    >
+                      <span className="deviceMarkerIcon" aria-hidden="true">
+                        {getDeviceTypeIcon(device.type)}
+                      </span>
+                    </button>
                     <span className="deviceLabel">{device.name}</span>
                   </div>
                 ))}
@@ -600,7 +683,7 @@ export default function Home() {
                   return (
                     <div key={device.id} className="linkActionRow">
                       <span className="linkDeviceName">
-                        {getLinkIcon(device.type)} {device.name}
+                        {getDeviceTypeIcon(device.type)} {device.name}
                       </span>
                       <button type="button" className="linkActionButton" onClick={() => onLinkToggle(device.id)}>
                         {linked ? '➖ Remove link' : '➕ Add link'}
