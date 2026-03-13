@@ -116,16 +116,21 @@ button:hover {
   border: 1px solid #d1d5db;
   border-radius: 12px;
   overflow: hidden;
-  cursor: crosshair;
+  cursor: grab;
   background: #f9fafb;
   margin-top: 0.75rem;
   min-height: 320px;
 }
 
+.floorCanvas.isPanning {
+  cursor: grabbing;
+}
+
 .floorCanvasStage {
   position: relative;
   transform-origin: top left;
-  transition: transform 0.15s ease;
+  transition: transform 0.1s ease;
+  will-change: transform;
 }
 
 .floorCanvas img {
@@ -153,26 +158,25 @@ button:hover {
 
 .deviceMarker {
   position: relative;
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 2px solid #1d4ed8;
   padding: 0;
   margin: 0;
   background: white;
   cursor: grab;
+  display: grid;
+  place-items: center;
 }
 
-.deviceMarker::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: #93c5fd;
+.deviceMarkerIcon {
+  font-size: 13px;
+  line-height: 1;
 }
 
-.deviceMarker[data-poe='true']::after {
-  background: #f59e0b;
+.deviceMarker[data-poe='true'] {
+  background: #fffbeb;
 }
 
 .deviceMarker:active {
@@ -182,10 +186,6 @@ button:hover {
 .deviceMarker.selected {
   border-color: #1e40af;
   box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.25);
-}
-
-.deviceMarker.selected::after {
-  background: #1d4ed8;
 }
 
 .linkOverlay {
