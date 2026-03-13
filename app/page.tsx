@@ -48,6 +48,7 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showLinks, setShowLinks] = useState(true);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const dragDeviceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const loadState = async () => {
@@ -246,6 +247,54 @@ export default function Home() {
     }));
   };
 
+  const moveDeviceToPointer = (deviceId: string, clientX: number, clientY: number) => {
+    if (!imageContainerRef.current) {
+      return;
+    }
+
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+
+    setState((prev) => ({
+      ...prev,
+      devices: prev.devices.map((device) =>
+        device.id === deviceId
+          ? {
+              ...device,
+              x: Math.min(100, Math.max(0, x)),
+              y: Math.min(100, Math.max(0, y))
+            }
+          : device
+      )
+    }));
+  };
+
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      const draggingDeviceId = dragDeviceIdRef.current;
+      if (!draggingDeviceId) {
+        return;
+      }
+
+      moveDeviceToPointer(draggingDeviceId, event.clientX, event.clientY);
+    };
+
+    const stopDragging = () => {
+      dragDeviceIdRef.current = null;
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', stopDragging);
+    window.addEventListener('pointercancel', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+      window.removeEventListener('pointercancel', stopDragging);
+    };
+  }, []);
+
   const updateSelectedDevice = (updates: Partial<Device>) => {
     if (!selectedDevice) {
       return;
@@ -401,14 +450,23 @@ export default function Home() {
               {floorDevices.map((device) => (
                 <button
                   key={device.id}
+                  type="button"
                   data-device-marker="true"
                   className={device.id === state.selectedDeviceId ? 'deviceMarker selected' : 'deviceMarker'}
+                  data-poe={poeDeviceTypes.has(device.type) ? 'true' : 'false'}
                   style={{ left: `${device.x}%`, top: `${device.y}%` }}
-                  onClick={() => setState((prev) => ({ ...prev, selectedDeviceId: device.id }))}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    dragDeviceIdRef.current = device.id;
+                    moveDeviceToPointer(device.id, event.clientX, event.clientY);
+                    setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
+                  }}
                   title={device.name}
-                >
-                  ●{poeDeviceTypes.has(device.type) ? ' ⚡' : ''}
-                </button>
+                />
               ))}
             </div>
           </>
@@ -457,6 +515,16 @@ export default function Home() {
             <div className="list">
               {state.devices
                 .filter((device) => device.id !== selectedDevice.id)
+                .sort((a, b) => {
+                  const aLinked = selectedDevice.linkedDeviceIds.includes(a.id);
+                  const bLinked = selectedDevice.linkedDeviceIds.includes(b.id);
+
+                  if (aLinked !== bLinked) {
+                    return aLinked ? -1 : 1;
+                  }
+
+                  return a.name.localeCompare(b.name);
+                })
                 .map((device) => {
                   const linked = selectedDevice.linkedDeviceIds.includes(device.id);
                   return (
