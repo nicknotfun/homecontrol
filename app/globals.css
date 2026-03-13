@@ -33,6 +33,7 @@ body {
 label,
 input,
 textarea,
+select,
 button {
   display: block;
   width: 100%;
@@ -40,6 +41,7 @@ button {
 
 input,
 textarea,
+select,
 button {
   margin-top: 0.35rem;
   margin-bottom: 0.75rem;
@@ -73,6 +75,26 @@ button:hover {
   background: #dbeafe;
 }
 
+.canvasHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.canvasHeader h2 {
+  margin: 0;
+}
+
+.toggleLinks {
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 .floorCanvas {
   position: relative;
   width: 100%;
@@ -81,6 +103,7 @@ button:hover {
   overflow: hidden;
   cursor: crosshair;
   background: #f9fafb;
+  margin-top: 0.75rem;
 }
 
 .floorCanvas img {
@@ -90,9 +113,10 @@ button:hover {
 
 .deviceMarker {
   position: absolute;
-  width: 24px;
-  height: 24px;
+  min-width: 30px;
+  height: 26px;
   border-radius: 999px;
+  white-space: nowrap;
   border: 1px solid #1d4ed8;
   color: #1d4ed8;
   display: grid;
@@ -116,9 +140,12 @@ button:hover {
   pointer-events: none;
 }
 
-.linkOverlay line {
+.routedLink {
+  fill: none;
   stroke: #f97316;
-  stroke-width: 0.6;
+  stroke-width: 0.52;
+  stroke-linejoin: round;
+  stroke-dasharray: 1.4 0.7;
 }
 
 .muted {
@@ -139,16 +166,24 @@ button:hover {
   border-radius: 12px;
 }
 
-.checkboxRow {
+.linkActionRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
 }
 
-.checkboxRow input {
+.linkDeviceName {
+  font-size: 0.92rem;
+}
+
+.linkActionButton {
   width: auto;
   margin: 0;
+  padding: 0.35rem 0.55rem;
 }
 
 .danger {
