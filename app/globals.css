@@ -87,6 +87,14 @@ button:hover {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.canvasControls {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .canvasHeader h2 {
@@ -111,6 +119,13 @@ button:hover {
   cursor: crosshair;
   background: #f9fafb;
   margin-top: 0.75rem;
+  min-height: 320px;
+}
+
+.floorCanvasStage {
+  position: relative;
+  transform-origin: top left;
+  transition: transform 0.15s ease;
 }
 
 .floorCanvas img {
@@ -118,13 +133,30 @@ button:hover {
   display: block;
 }
 
-.deviceMarker {
+
+.deviceWithLabel {
   position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.deviceLabel {
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.deviceMarker {
+  position: relative;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid #1d4ed8;
-  transform: translate(-50%, -50%);
   padding: 0;
   margin: 0;
   background: white;

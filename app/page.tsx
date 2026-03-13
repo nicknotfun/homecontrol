@@ -49,6 +49,8 @@ export default function Home() {
   const [showLinks, setShowLinks] = useState(true);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const dragDeviceIdRef = useRef<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const loadState = async () => {
@@ -117,19 +119,34 @@ export default function Home() {
     [state.devices, state.selectedDeviceId]
   );
 
+  useEffect(() => {
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, [state.selectedFloorId]);
+
   const floorLinks = useMemo<FloorLink[]>(() => {
     const links: FloorLink[] = [];
     floorDevices.forEach((device) => {
       device.linkedDeviceIds.forEach((linkedId) => {
-        const linked = floorDevices.find((candidate) => candidate.id === linkedId);
+        const linked = state.devices.find((candidate) => candidate.id === linkedId);
         if (!linked || linked.id < device.id) {
           return;
         }
-        links.push({ a: device, b: linked, order: links.length });
+
+        const mappedLinked =
+          linked.floorId === state.selectedFloorId
+            ? linked
+            : {
+                ...linked,
+                x: linked.x > 50 ? 99 : 1,
+                y: linked.y > 50 ? 99 : 1
+              };
+
+        links.push({ a: device, b: mappedLinked, order: links.length });
       });
     });
     return links;
-  }, [floorDevices]);
+  }, [floorDevices, state.devices, state.selectedFloorId]);
 
   const onCreateFloor = () => {
     if (!newFloorFile) {
@@ -221,7 +238,7 @@ export default function Home() {
     }
 
     const target = event.target as HTMLElement;
-    if (target.dataset.deviceMarker === 'true') {
+    if (target.closest('[data-device-marker="true"]')) {
       return;
     }
 
@@ -363,6 +380,24 @@ export default function Home() {
     setError(null);
   };
 
+  const updateZoom = (direction: 'in' | 'out') => {
+    setZoomLevel((prev) => {
+      if (direction === 'in') {
+        return Math.min(3, Number((prev + 0.2).toFixed(2)));
+      }
+      return Math.max(0.6, Number((prev - 0.2).toFixed(2)));
+    });
+  };
+
+  const panBy = (x: number, y: number) => {
+    setPanOffset((prev) => ({ x: prev.x + x, y: prev.y + y }));
+  };
+
+  const resetView = () => {
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+  };
+
   return (
     <main className="page">
       <section className="sidebar">
@@ -430,44 +465,79 @@ export default function Home() {
           <>
             <div className="canvasHeader">
               <h2>{selectedFloor.name}</h2>
-              <button className="toggleLinks" onClick={() => setShowLinks((prev) => !prev)} type="button">
-                {showLinks ? 'Hide links' : 'Show links'} ({floorLinks.length})
-              </button>
+              <div className="canvasControls">
+                <button className="toggleLinks" onClick={() => setShowLinks((prev) => !prev)} type="button">
+                  {showLinks ? 'Hide links' : 'Show links'} ({floorLinks.length})
+                </button>
+                <button className="toggleLinks" onClick={() => updateZoom('in')} type="button">
+                  Zoom +
+                </button>
+                <button className="toggleLinks" onClick={() => updateZoom('out')} type="button">
+                  Zoom -
+                </button>
+                <button className="toggleLinks" onClick={() => panBy(0, -25)} type="button">
+                  ↑
+                </button>
+                <button className="toggleLinks" onClick={() => panBy(-25, 0)} type="button">
+                  ←
+                </button>
+                <button className="toggleLinks" onClick={() => panBy(25, 0)} type="button">
+                  →
+                </button>
+                <button className="toggleLinks" onClick={() => panBy(0, 25)} type="button">
+                  ↓
+                </button>
+                <button className="toggleLinks" onClick={resetView} type="button">
+                  Reset view
+                </button>
+              </div>
             </div>
-            <div className="floorCanvas" ref={imageContainerRef} onClick={onFloorClick}>
-              <img src={selectedFloor.imageDataUrl} alt={`${selectedFloor.name} floor plan`} />
-              {showLinks && (
-                <svg className="linkOverlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  {floorLinks.map((link) => (
-                    <path
-                      key={`${link.a.id}-${link.b.id}`}
-                      d={linkPath(link.a, link.b, link.order)}
-                      className="routedLink"
+            <div className="floorCanvas" onClick={onFloorClick}>
+              <div
+                className="floorCanvasStage"
+                ref={imageContainerRef}
+                style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})` }}
+              >
+                <img src={selectedFloor.imageDataUrl} alt={`${selectedFloor.name} floor plan`} />
+                {showLinks && (
+                  <svg className="linkOverlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    {floorLinks.map((link) => (
+                      <path
+                        key={`${link.a.id}-${link.b.id}`}
+                        d={linkPath(link.a, link.b, link.order)}
+                        className="routedLink"
+                      />
+                    ))}
+                  </svg>
+                )}
+                {floorDevices.map((device) => (
+                  <div
+                    key={device.id}
+                    className="deviceWithLabel"
+                    data-device-marker="true"
+                    style={{ left: `${device.x}%`, top: `${device.y}%` }}
+                  >
+                    <button
+                      type="button"
+                      data-device-marker="true"
+                      className={device.id === state.selectedDeviceId ? 'deviceMarker selected' : 'deviceMarker'}
+                      data-poe={poeDeviceTypes.has(device.type) ? 'true' : 'false'}
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                        dragDeviceIdRef.current = device.id;
+                        moveDeviceToPointer(device.id, event.clientX, event.clientY);
+                        setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
+                      }}
+                      title={device.name}
                     />
-                  ))}
-                </svg>
-              )}
-              {floorDevices.map((device) => (
-                <button
-                  key={device.id}
-                  type="button"
-                  data-device-marker="true"
-                  className={device.id === state.selectedDeviceId ? 'deviceMarker selected' : 'deviceMarker'}
-                  data-poe={poeDeviceTypes.has(device.type) ? 'true' : 'false'}
-                  style={{ left: `${device.x}%`, top: `${device.y}%` }}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    dragDeviceIdRef.current = device.id;
-                    moveDeviceToPointer(device.id, event.clientX, event.clientY);
-                    setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
-                  }}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setState((prev) => ({ ...prev, selectedDeviceId: device.id }));
-                  }}
-                  title={device.name}
-                />
-              ))}
+                    <span className="deviceLabel">{device.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}
