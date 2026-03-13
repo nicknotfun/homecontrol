@@ -1,0 +1,164 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f9;
+  color: #111827;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.sidebar,
+.canvasSection,
+.details {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+label,
+input,
+textarea,
+button {
+  display: block;
+  width: 100%;
+}
+
+input,
+textarea,
+button {
+  margin-top: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: #f3f4f6;
+}
+
+button:hover {
+  background: #e5e7eb;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.listItem {
+  text-align: left;
+}
+
+.listItem.active {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.floorCanvas {
+  position: relative;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: crosshair;
+  background: #f9fafb;
+}
+
+.floorCanvas img {
+  width: 100%;
+  display: block;
+}
+
+.deviceMarker {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #1d4ed8;
+  color: #1d4ed8;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  margin: 0;
+  background: white;
+}
+
+.deviceMarker.selected {
+  background: #1d4ed8;
+  color: white;
+}
+
+.linkOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.linkOverlay line {
+  stroke: #f97316;
+  stroke-width: 0.6;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.emptyState {
+  height: 100%;
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  color: #6b7280;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.checkboxRow input {
+  width: auto;
+  margin: 0;
+}
+
+.danger {
+  color: #991b1b;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+@media (max-width: 1200px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+}
