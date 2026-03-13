@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   AppState,
@@ -42,6 +42,7 @@ function getLinkIcon(type: DeviceType): string {
 export default function Home() {
   const [state, setState] = useState<AppState>(emptyState);
   const [newFloorName, setNewFloorName] = useState('');
+  const [newFloorFile, setNewFloorFile] = useState<File | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -129,14 +130,14 @@ export default function Home() {
     return links;
   }, [floorDevices]);
 
-  const onUploadFloorPlan = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
+  const onCreateFloor = () => {
+    if (!newFloorFile) {
+      setError('Please choose a floor plan image before creating a floor.');
       return;
     }
 
     if (!newFloorName.trim()) {
-      setError('Please enter a floor name before uploading a floor plan.');
+      setError('Please enter a floor name before creating a floor.');
       return;
     }
 
@@ -161,11 +162,56 @@ export default function Home() {
         selectedDeviceId: undefined
       }));
       setNewFloorName('');
+      setNewFloorFile(null);
       setError(null);
-      event.target.value = '';
+      const floorUploadInput = document.getElementById('floor-upload') as HTMLInputElement | null;
+      if (floorUploadInput) {
+        floorUploadInput.value = '';
+      }
     };
 
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(newFloorFile);
+  };
+
+  const onDeleteFloor = (floorId: string) => {
+    const floor = state.floors.find((candidate) => candidate.id === floorId);
+    if (!floor) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete "${floor.name}" and all devices on this floor? This cannot be undone.`
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setState((prev) => {
+      const removedDeviceIds = new Set(
+        prev.devices.filter((device) => device.floorId === floorId).map((device) => device.id)
+      );
+      const nextFloors = prev.floors.filter((candidate) => candidate.id !== floorId);
+      const filteredDevices = prev.devices
+        .filter((device) => device.floorId !== floorId)
+        .map((device) => ({
+          ...device,
+          linkedDeviceIds: device.linkedDeviceIds.filter((id) => !removedDeviceIds.has(id))
+        }));
+
+      const selectedFloorId =
+        prev.selectedFloorId === floorId ? nextFloors[0]?.id : prev.selectedFloorId;
+      const selectedDeviceId = removedDeviceIds.has(prev.selectedDeviceId ?? '')
+        ? undefined
+        : prev.selectedDeviceId;
+
+      return {
+        ...prev,
+        floors: nextFloors,
+        devices: filteredDevices,
+        selectedFloorId,
+        selectedDeviceId
+      };
+    });
   };
 
   const onFloorClick = (event: MouseEvent<HTMLDivElement>) => {
@@ -283,21 +329,38 @@ export default function Home() {
         />
 
         <label htmlFor="floor-upload">Floor plan image</label>
-        <input id="floor-upload" type="file" accept="image/*" onChange={onUploadFloorPlan} />
+        <input
+          id="floor-upload"
+          type="file"
+          accept="image/*"
+          onChange={(event) => {
+            setNewFloorFile(event.target.files?.[0] ?? null);
+            setError(null);
+          }}
+        />
+
+        <button type="button" onClick={onCreateFloor}>
+          + Add floor
+        </button>
 
         <h2>Floors</h2>
         <div className="list">
           {state.floors.length === 0 && <p className="muted">No floors yet.</p>}
           {state.floors.map((floor) => (
-            <button
-              key={floor.id}
-              className={floor.id === state.selectedFloorId ? 'listItem active' : 'listItem'}
-              onClick={() =>
-                setState((prev) => ({ ...prev, selectedFloorId: floor.id, selectedDeviceId: undefined }))
-              }
-            >
-              {floor.name}
-            </button>
+            <div key={floor.id} className="listRow">
+              <button
+                className={floor.id === state.selectedFloorId ? 'listItem active' : 'listItem'}
+                onClick={() =>
+                  setState((prev) => ({ ...prev, selectedFloorId: floor.id, selectedDeviceId: undefined }))
+                }
+                type="button"
+              >
+                {floor.name}
+              </button>
+              <button className="danger floorDelete" onClick={() => onDeleteFloor(floor.id)} type="button">
+                Delete
+              </button>
+            </div>
           ))}
         </div>
 
