@@ -2,38 +2,41 @@
 
 import { ChangeEvent, FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-type Device = {
-  id: string;
-  floorId: string;
-  name: string;
-  notes: string;
-  x: number;
-  y: number;
-  linkedDeviceIds: string[];
-};
+import {
+  AppState,
+  DEFAULT_DEVICE_TYPE,
+  DEVICE_TYPES,
+  Device,
+  DeviceType,
+  emptyState,
+  poeDeviceTypes
+} from '@/lib/layout-types';
 
-type Floor = {
-  id: string;
-  name: string;
-  imageDataUrl: string;
-};
-
-type AppState = {
-  floors: Floor[];
-  devices: Device[];
-  selectedFloorId?: string;
-  selectedDeviceId?: string;
-};
-
-const STORAGE_KEY = 'homecontrol-layout-state-v1';
-
-const emptyState: AppState = {
-  floors: [],
-  devices: []
+type FloorLink = {
+  a: Device;
+  b: Device;
+  order: number;
 };
 
 function uid(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function linkPath(a: Device, b: Device, order: number): string {
+  const offset = ((order % 5) - 2) * 2.2;
+  const horizontalFirst = Math.abs(a.x - b.x) >= Math.abs(a.y - b.y);
+
+  if (horizontalFirst) {
+    const midX = (a.x + b.x) / 2 + offset;
+    return `M ${a.x} ${a.y} L ${midX} ${a.y} L ${midX} ${b.y} L ${b.x} ${b.y}`;
+  }
+
+  const midY = (a.y + b.y) / 2 + offset;
+  return `M ${a.x} ${a.y} L ${a.x} ${midY} L ${b.x} ${midY} L ${b.x} ${b.y}`;
+}
+
+function getLinkIcon(type: DeviceType): string {
+  return type === 'wifi-point' ? '🛜' : '🔌';
 }
 
 export default function Home() {
@@ -41,27 +44,60 @@ export default function Home() {
   const [newFloorName, setNewFloorName] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showLinks, setShowLinks] = useState(true);
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as AppState;
-        setState(parsed);
+    const loadState = async () => {
+      try {
+        const response = await fetch('/api/layout');
+        const nextState = (await response.json()) as AppState;
+
+        if (!response.ok) {
+          throw new Error('Failed to load layout from Postgres.');
+        }
+
+        setState(nextState);
+      } catch {
+        setError('Failed to load saved layout from Postgres.');
+      } finally {
+        setIsLoaded(true);
       }
-    } catch {
-      setError('Failed to load saved layout from local storage.');
-    } finally {
-      setIsLoaded(true);
-    }
+    };
+
+    loadState();
   }, []);
 
   useEffect(() => {
     if (!isLoaded) {
       return;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const timeoutId = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        const response = await fetch('/api/layout', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(state)
+        });
+
+        if (!response.ok) {
+          throw new Error('save failed');
+        }
+
+        setError(null);
+      } catch {
+        setError('Failed to save layout to Postgres.');
+      } finally {
+        setIsSaving(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
   }, [state, isLoaded]);
 
   const selectedFloor = useMemo(
@@ -78,6 +114,20 @@ export default function Home() {
     () => state.devices.find((device) => device.id === state.selectedDeviceId),
     [state.devices, state.selectedDeviceId]
   );
+
+  const floorLinks = useMemo<FloorLink[]>(() => {
+    const links: FloorLink[] = [];
+    floorDevices.forEach((device) => {
+      device.linkedDeviceIds.forEach((linkedId) => {
+        const linked = floorDevices.find((candidate) => candidate.id === linkedId);
+        if (!linked || linked.id < device.id) {
+          return;
+        }
+        links.push({ a: device, b: linked, order: links.length });
+      });
+    });
+    return links;
+  }, [floorDevices]);
 
   const onUploadFloorPlan = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -98,7 +148,7 @@ export default function Home() {
         return;
       }
 
-      const newFloor: Floor = {
+      const newFloor = {
         id: uid('floor'),
         name: newFloorName.trim(),
         imageDataUrl
@@ -137,6 +187,7 @@ export default function Home() {
       floorId: selectedFloor.id,
       name: `Device ${floorDevices.length + 1}`,
       notes: '',
+      type: DEFAULT_DEVICE_TYPE,
       x,
       y,
       linkedDeviceIds: []
@@ -215,7 +266,6 @@ export default function Home() {
     event.preventDefault();
     setState(emptyState);
     setError(null);
-    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
@@ -242,7 +292,9 @@ export default function Home() {
             <button
               key={floor.id}
               className={floor.id === state.selectedFloorId ? 'listItem active' : 'listItem'}
-              onClick={() => setState((prev) => ({ ...prev, selectedFloorId: floor.id, selectedDeviceId: undefined }))}
+              onClick={() =>
+                setState((prev) => ({ ...prev, selectedFloorId: floor.id, selectedDeviceId: undefined }))
+              }
             >
               {floor.name}
             </button>
@@ -255,6 +307,7 @@ export default function Home() {
           </button>
         </form>
 
+        <p className="muted">Storage: PostgreSQL {isSaving ? '(saving...)' : ''}</p>
         {error && <p className="error">{error}</p>}
       </section>
 
@@ -263,30 +316,25 @@ export default function Home() {
           <div className="emptyState">Upload at least one floor plan to start placing devices.</div>
         ) : (
           <>
-            <h2>{selectedFloor.name}</h2>
+            <div className="canvasHeader">
+              <h2>{selectedFloor.name}</h2>
+              <button className="toggleLinks" onClick={() => setShowLinks((prev) => !prev)} type="button">
+                {showLinks ? 'Hide links' : 'Show links'} ({floorLinks.length})
+              </button>
+            </div>
             <div className="floorCanvas" ref={imageContainerRef} onClick={onFloorClick}>
               <img src={selectedFloor.imageDataUrl} alt={`${selectedFloor.name} floor plan`} />
-              <svg className="linkOverlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {floorDevices.flatMap((device) =>
-                  device.linkedDeviceIds
-                    .map((linkedId) => {
-                      const linked = floorDevices.find((d) => d.id === linkedId);
-                      if (!linked || linked.id < device.id) {
-                        return null;
-                      }
-                      return (
-                        <line
-                          key={`${device.id}-${linked.id}`}
-                          x1={device.x}
-                          y1={device.y}
-                          x2={linked.x}
-                          y2={linked.y}
-                        />
-                      );
-                    })
-                    .filter(Boolean)
-                )}
-              </svg>
+              {showLinks && (
+                <svg className="linkOverlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {floorLinks.map((link) => (
+                    <path
+                      key={`${link.a.id}-${link.b.id}`}
+                      d={linkPath(link.a, link.b, link.order)}
+                      className="routedLink"
+                    />
+                  ))}
+                </svg>
+              )}
               {floorDevices.map((device) => (
                 <button
                   key={device.id}
@@ -296,7 +344,7 @@ export default function Home() {
                   onClick={() => setState((prev) => ({ ...prev, selectedDeviceId: device.id }))}
                   title={device.name}
                 >
-                  ●
+                  ●{poeDeviceTypes.has(device.type) ? ' ⚡' : ''}
                 </button>
               ))}
             </div>
@@ -317,6 +365,20 @@ export default function Home() {
               onChange={(event) => updateSelectedDevice({ name: event.target.value })}
             />
 
+            <label htmlFor="device-type">Type</label>
+            <select
+              id="device-type"
+              value={selectedDevice.type}
+              onChange={(event) => updateSelectedDevice({ type: event.target.value as DeviceType })}
+            >
+              {DEVICE_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                  {type.poe ? ' [PoE]' : ''}
+                </option>
+              ))}
+            </select>
+
             <label htmlFor="device-notes">Notes</label>
             <textarea
               id="device-notes"
@@ -325,17 +387,24 @@ export default function Home() {
               rows={4}
             />
 
-            <h3>Linked devices</h3>
+            <h3>
+              Linked devices ({selectedDevice.linkedDeviceIds.length})
+              {selectedDevice.type === 'network-switch' ? ' • switch uplinks + edge links visible' : ''}
+            </h3>
             <div className="list">
               {state.devices
                 .filter((device) => device.id !== selectedDevice.id)
                 .map((device) => {
-                  const checked = selectedDevice.linkedDeviceIds.includes(device.id);
+                  const linked = selectedDevice.linkedDeviceIds.includes(device.id);
                   return (
-                    <label key={device.id} className="checkboxRow">
-                      <input type="checkbox" checked={checked} onChange={() => onLinkToggle(device.id)} />
-                      <span>{device.name}</span>
-                    </label>
+                    <div key={device.id} className="linkActionRow">
+                      <span className="linkDeviceName">
+                        {getLinkIcon(device.type)} {device.name}
+                      </span>
+                      <button type="button" className="linkActionButton" onClick={() => onLinkToggle(device.id)}>
+                        {linked ? '➖ Remove link' : '➕ Add link'}
+                      </button>
+                    </div>
                   );
                 })}
               {state.devices.length <= 1 && <p className="muted">Create at least two devices to add links.</p>}
