@@ -15,10 +15,44 @@ body {
 
 .page {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.topActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.togglePanel {
+  width: auto;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.workspace {
+  min-height: 0;
   display: grid;
   grid-template-columns: 280px 1fr 320px;
   gap: 1rem;
-  padding: 1rem;
+}
+
+.workspace[data-left-panel-visible='false'] {
+  grid-template-columns: 1fr 320px;
+}
+
+.workspace[data-right-panel-visible='false'] {
+  grid-template-columns: 280px 1fr;
+}
+
+.workspace[data-left-panel-visible='false'][data-right-panel-visible='false'] {
+  grid-template-columns: 1fr;
 }
 
 .sidebar,
@@ -263,7 +297,10 @@ button:hover {
 }
 
 @media (max-width: 1200px) {
-  .page {
+  .workspace,
+  .workspace[data-left-panel-visible='false'],
+  .workspace[data-right-panel-visible='false'],
+  .workspace[data-left-panel-visible='false'][data-right-panel-visible='false'] {
     grid-template-columns: 1fr;
   }
 }
