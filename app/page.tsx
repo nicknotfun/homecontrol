@@ -497,23 +497,6 @@ export default function Home() {
 
   return (
     <main className="page">
-      <div className="topActions">
-        <button
-          type="button"
-          className="togglePanel"
-          onClick={() => setIsLeftPanelVisible((prev) => !prev)}
-        >
-          {isLeftPanelVisible ? 'Hide left panel' : 'Show left panel'}
-        </button>
-        <button
-          type="button"
-          className="togglePanel"
-          onClick={() => setIsRightPanelVisible((prev) => !prev)}
-        >
-          {isRightPanelVisible ? 'Hide right panel' : 'Show right panel'}
-        </button>
-      </div>
-
       <div
         className="workspace"
         data-left-panel-visible={isLeftPanelVisible ? 'true' : 'false'}
@@ -578,6 +561,24 @@ export default function Home() {
       </section>}
 
       <section className="canvasSection">
+        <button
+          type="button"
+          className="panelToggleCorner panelToggleLeft"
+          onClick={() => setIsLeftPanelVisible((prev) => !prev)}
+          aria-label={isLeftPanelVisible ? 'Hide left panel' : 'Show left panel'}
+          title={isLeftPanelVisible ? 'Hide left panel' : 'Show left panel'}
+        >
+          {isLeftPanelVisible ? '◀' : '▶'}
+        </button>
+        <button
+          type="button"
+          className="panelToggleCorner panelToggleRight"
+          onClick={() => setIsRightPanelVisible((prev) => !prev)}
+          aria-label={isRightPanelVisible ? 'Hide right panel' : 'Show right panel'}
+          title={isRightPanelVisible ? 'Hide right panel' : 'Show right panel'}
+        >
+          {isRightPanelVisible ? '▶' : '◀'}
+        </button>
         {!selectedFloor ? (
           <div className="emptyState">Upload at least one floor plan to start placing devices.</div>
         ) : (
