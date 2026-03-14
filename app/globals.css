@@ -126,6 +126,14 @@ button:hover {
   cursor: grabbing;
 }
 
+.floorCanvas[data-adding-device='true'] {
+  cursor: crosshair;
+}
+
+.floorCanvas[data-adding-device='true'].isPanning {
+  cursor: grabbing;
+}
+
 .floorCanvasStage {
   position: relative;
   transform-origin: top left;
