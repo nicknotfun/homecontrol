@@ -4,13 +4,13 @@ import { FormEvent, MouseEvent, PointerEvent as ReactPointerEvent, WheelEvent, u
 
 import {
   AppState,
-  DEFAULT_DEVICE_TYPE,
   DEVICE_TYPES,
   Device,
   DeviceType,
   emptyState,
   poeDeviceTypes
 } from '@/lib/layout-types';
+import { createDeviceDraft, toCanvasPercent } from '@/lib/canvas-utils';
 
 type FloorLink = {
   a: Device;
@@ -65,7 +65,10 @@ export default function Home() {
   const panMovedRef = useRef(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const zoomLevelRef = useRef(1);
+  const panOffsetRef = useRef({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isAddingDevice, setIsAddingDevice] = useState(false);
 
   useEffect(() => {
     const loadState = async () => {
@@ -87,6 +90,14 @@ export default function Home() {
 
     loadState();
   }, []);
+
+  useEffect(() => {
+    zoomLevelRef.current = zoomLevel;
+  }, [zoomLevel]);
+
+  useEffect(() => {
+    panOffsetRef.current = panOffset;
+  }, [panOffset]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -138,6 +149,7 @@ export default function Home() {
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
     panMovedRef.current = false;
+    setIsAddingDevice(false);
   }, [state.selectedFloorId]);
 
   const floorLinks = useMemo<FloorLink[]>(() => {
@@ -263,26 +275,31 @@ export default function Home() {
       return;
     }
 
-    const rect = imageContainerRef.current.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    if (!isAddingDevice) {
+      return;
+    }
 
-    const newDevice: Device = {
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    const point = toCanvasPercent(
+      { x: event.clientX, y: event.clientY },
+      rect,
+      panOffsetRef.current,
+      zoomLevelRef.current
+    );
+
+    const newDevice = createDeviceDraft({
       id: uid('device'),
       floorId: selectedFloor.id,
-      name: `Device ${floorDevices.length + 1}`,
-      notes: '',
-      type: DEFAULT_DEVICE_TYPE,
-      x,
-      y,
-      linkedDeviceIds: []
-    };
+      existingDeviceCountOnFloor: floorDevices.length,
+      point
+    });
 
     setState((prev) => ({
       ...prev,
       devices: [...prev.devices, newDevice],
       selectedDeviceId: newDevice.id
     }));
+    setIsAddingDevice(false);
   };
 
 
@@ -328,8 +345,12 @@ export default function Home() {
     }
 
     const rect = imageContainerRef.current.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * 100;
-    const y = ((clientY - rect.top) / rect.height) * 100;
+    const point = toCanvasPercent(
+      { x: clientX, y: clientY },
+      rect,
+      panOffsetRef.current,
+      zoomLevelRef.current
+    );
 
     setState((prev) => ({
       ...prev,
@@ -337,8 +358,8 @@ export default function Home() {
         device.id === deviceId
           ? {
               ...device,
-              x: Math.min(100, Math.max(0, x)),
-              y: Math.min(100, Math.max(0, y))
+              x: point.x,
+              y: point.y
             }
           : device
       )
@@ -476,7 +497,7 @@ export default function Home() {
     <main className="page">
       <section className="sidebar">
         <h1>Home Layout Planner</h1>
-        <p className="muted">Upload floor plans, add devices by clicking the plan, and link related devices.</p>
+        <p className="muted">Upload floor plans, arm Add device, place markers, and link related devices.</p>
 
         <label htmlFor="floor-name">Floor name</label>
         <input
@@ -543,6 +564,13 @@ export default function Home() {
                 <button className="toggleLinks" onClick={() => setShowLinks((prev) => !prev)} type="button">
                   {showLinks ? 'Hide links' : 'Show links'} ({floorLinks.length})
                 </button>
+                <button
+                  className="toggleLinks"
+                  onClick={() => setIsAddingDevice((prev) => !prev)}
+                  type="button"
+                >
+                  {isAddingDevice ? 'Cancel add' : '+ Add device'}
+                </button>
                 <button className="toggleLinks" onClick={() => updateZoom('in')} type="button">
                   Zoom +
                 </button>
@@ -568,6 +596,7 @@ export default function Home() {
             </div>
             <div
               className={isPanning ? "floorCanvas isPanning" : "floorCanvas"}
+              data-adding-device={isAddingDevice ? 'true' : 'false'}
               onClick={onFloorClick}
               onPointerDown={onCanvasPointerDown}
               onWheel={onCanvasWheel}
