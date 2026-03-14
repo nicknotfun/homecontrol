@@ -59,6 +59,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showLinks, setShowLinks] = useState(true);
+  const [isLeftPanelVisible, setIsLeftPanelVisible] = useState(true);
+  const [isRightPanelVisible, setIsRightPanelVisible] = useState(true);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const dragDeviceIdRef = useRef<string | null>(null);
   const panDragRef = useRef<{ x: number; y: number } | null>(null);
@@ -77,12 +79,12 @@ export default function Home() {
         const nextState = (await response.json()) as AppState;
 
         if (!response.ok) {
-          throw new Error('Failed to load layout from Postgres.');
+          throw new Error('Failed to load layout.');
         }
 
         setState(nextState);
       } catch {
-        setError('Failed to load saved layout from Postgres.');
+        setError('Failed to load saved layout.');
       } finally {
         setIsLoaded(true);
       }
@@ -121,7 +123,7 @@ export default function Home() {
 
         setError(null);
       } catch {
-        setError('Failed to save layout to Postgres.');
+        setError('Failed to save layout.');
       } finally {
         setIsSaving(false);
       }
@@ -495,7 +497,12 @@ export default function Home() {
 
   return (
     <main className="page">
-      <section className="sidebar">
+      <div
+        className="workspace"
+        data-left-panel-visible={isLeftPanelVisible ? 'true' : 'false'}
+        data-right-panel-visible={isRightPanelVisible ? 'true' : 'false'}
+      >
+      {isLeftPanelVisible && <section className="sidebar">
         <h1>Home Layout Planner</h1>
         <p className="muted">Upload floor plans, arm Add device, place markers, and link related devices.</p>
 
@@ -549,11 +556,29 @@ export default function Home() {
           </button>
         </form>
 
-        <p className="muted">Storage: PostgreSQL {isSaving ? '(saving...)' : ''}</p>
+        <p className="muted">Storage sync {isSaving ? '(saving...)' : '(up to date)'}</p>
         {error && <p className="error">{error}</p>}
-      </section>
+      </section>}
 
       <section className="canvasSection">
+        <button
+          type="button"
+          className="panelToggleCorner panelToggleLeft"
+          onClick={() => setIsLeftPanelVisible((prev) => !prev)}
+          aria-label={isLeftPanelVisible ? 'Hide left panel' : 'Show left panel'}
+          title={isLeftPanelVisible ? 'Hide left panel' : 'Show left panel'}
+        >
+          {isLeftPanelVisible ? '◀' : '▶'}
+        </button>
+        <button
+          type="button"
+          className="panelToggleCorner panelToggleRight"
+          onClick={() => setIsRightPanelVisible((prev) => !prev)}
+          aria-label={isRightPanelVisible ? 'Hide right panel' : 'Show right panel'}
+          title={isRightPanelVisible ? 'Hide right panel' : 'Show right panel'}
+        >
+          {isRightPanelVisible ? '▶' : '◀'}
+        </button>
         {!selectedFloor ? (
           <div className="emptyState">Upload at least one floor plan to start placing devices.</div>
         ) : (
@@ -655,7 +680,7 @@ export default function Home() {
         )}
       </section>
 
-      <section className="details">
+      {isRightPanelVisible && <section className="details">
         <h2>Device details</h2>
         {!selectedDevice ? (
           <p className="muted">Select or create a device to edit details.</p>
@@ -728,7 +753,8 @@ export default function Home() {
             </button>
           </>
         )}
-      </section>
+      </section>}
+      </div>
     </main>
   );
 }

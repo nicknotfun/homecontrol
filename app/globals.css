@@ -15,10 +15,30 @@ body {
 
 .page {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+
+.workspace {
+  min-height: 0;
   display: grid;
   grid-template-columns: 280px 1fr 320px;
   gap: 1rem;
-  padding: 1rem;
+}
+
+.workspace[data-left-panel-visible='false'] {
+  grid-template-columns: 1fr 320px;
+}
+
+.workspace[data-right-panel-visible='false'] {
+  grid-template-columns: 280px 1fr;
+}
+
+.workspace[data-left-panel-visible='false'][data-right-panel-visible='false'] {
+  grid-template-columns: 1fr;
 }
 
 .sidebar,
@@ -88,6 +108,35 @@ button:hover {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+
+.canvasSection {
+  position: relative;
+}
+
+.panelToggleCorner {
+  position: absolute;
+  top: 0.7rem;
+  z-index: 5;
+  width: 1.9rem;
+  height: 1.9rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.panelToggleLeft {
+  left: 0.7rem;
+}
+
+.panelToggleRight {
+  right: 0.7rem;
 }
 
 .canvasControls {
@@ -263,7 +312,10 @@ button:hover {
 }
 
 @media (max-width: 1200px) {
-  .page {
+  .workspace,
+  .workspace[data-left-panel-visible='false'],
+  .workspace[data-right-panel-visible='false'],
+  .workspace[data-left-panel-visible='false'][data-right-panel-visible='false'] {
     grid-template-columns: 1fr;
   }
 }
